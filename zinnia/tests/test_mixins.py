@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.contrib.sites.models import Site
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 from zinnia.models.entry import Entry
 from zinnia.models.author import Author
@@ -307,8 +308,10 @@ class MixinTestCase(TestCase):
 
     @skipIfCustomUser
     def test_prefetch_categories_authors_mixin(self):
-        author = Author.objects.create_user(username='author',
+        user = get_user_model().objects.create_user(
+                                            username='author',
                                             email='author@example.com')
+        author = Author.objects.get_or_create(user=user)[0]
         category = Category.objects.create(title='Category',
                                            slug='category')
         for i in range(3):

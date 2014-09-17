@@ -17,6 +17,7 @@ from django.contrib.auth.decorators import permission_required
 from django.utils import timezone
 
 from zinnia.models.entry import Entry
+from zinnia.models.author import Author
 from zinnia.managers import DRAFT
 from zinnia.managers import PUBLISHED
 from zinnia.settings import MARKUP_LANGUAGE
@@ -63,7 +64,7 @@ class QuickEntry(View):
             'slug': slugify(request.POST.get('title')),
             'status': DRAFT if 'save_draft' in request.POST else PUBLISHED,
             'sites': [Site.objects.get_current().pk],
-            'authors': [request.user.pk],
+            'authors': [Author.objects.get_or_create(user=request.user)[0].pk],
             'content_template': 'zinnia/_entry_detail.html',
             'detail_template': 'entry_detail.html',
             'creation_date': timezone.now(),
@@ -71,11 +72,11 @@ class QuickEntry(View):
             'content': request.POST.get('content'),
             'tags': request.POST.get('tags')}
         form = QuickEntryForm(data)
+
         if form.is_valid():
             form.instance.content = self.htmlize(form.cleaned_data['content'])
             entry = form.save()
             return redirect(entry)
-
         data = {'title': smart_str(request.POST.get('title', '')),
                 'content': smart_str(self.htmlize(
                     request.POST.get('content', ''))),

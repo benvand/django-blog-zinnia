@@ -11,6 +11,7 @@ from django.core.urlresolvers import reverse
 from django.contrib.sites.models import Site
 from django.test.utils import override_settings
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 import django_comments as comments
 from django_comments.models import CommentFlag
@@ -126,8 +127,9 @@ class TemplateTagsTestCase(TestCase):
         self.assertEqual(len(context['authors']), 0)
         self.assertEqual(context['template'], 'zinnia/tags/authors.html')
         self.assertEqual(context['context_author'], None)
-        author = Author.objects.create_user(username='webmaster',
-                                            email='webmaster@example.com')
+        user = get_user_model().objects.create_user(username='webmaster',
+                                                    email='webmaster@example.com')
+        author = Author.objects.get_or_create(user=user)[0]
         self.entry.authors.add(author)
         self.publish_entry()
         source_context = Context({'author': author})
@@ -462,13 +464,13 @@ class TemplateTagsTestCase(TestCase):
             self.assertEqual(len(context['comments']), 1)
             self.assertEqual(context['comments'][0].content_object,
                              self.entry)
-
-        author = Author.objects.create_user(username='webmaster',
-                                            email='webmaster@example.com')
+        user = get_user_model().objects.create_user(username='webmaster',
+                                                    email='webmaster@example.com')
+        author = Author.objects.get_or_create(user=user)[0]
         comment_2 = comments.get_model().objects.create(
             comment='My Comment 2', site=self.site,
             content_object=self.entry, submit_date=timezone.now())
-        comment_2.flags.create(user=author,
+        comment_2.flags.create(user=user,
                                flag=CommentFlag.MODERATOR_APPROVAL)
         with self.assertNumQueries(3):
             context = get_recent_comments()
@@ -481,8 +483,10 @@ class TemplateTagsTestCase(TestCase):
 
     @skipIfCustomUser
     def test_get_recent_linkbacks(self):
-        user = Author.objects.create_user(username='webmaster',
-                                          email='webmaster@example.com')
+
+        user = get_user_model().objects.create_user(username='webmaster',
+                                            email='webmaster@example.com')
+        author = Author.objects.get_or_create(user=user)[0]
         with self.assertNumQueries(1):
             context = get_recent_linkbacks()
         self.assertEqual(len(context['linkbacks']), 0)
@@ -748,12 +752,12 @@ class TemplateTagsTestCase(TestCase):
             context = zinnia_breadcrumbs(source_context)
         self.assertEqual(len(context['breadcrumbs']), 3)
         check_only_last_have_no_url(context['breadcrumbs'])
-
-        author = Author.objects.create_user(username='webmaster',
+        user = get_user_model().objects.create_user(username='webmaster',
                                             email='webmaster@example.com')
+        author = Author.objects.get_or_create(user=user)[0]
         source_context = Context(
             {'request': FakeRequest(author.get_absolute_url()),
-             'object': author})
+             'object': user})
         with self.assertNumQueries(0):
             context = zinnia_breadcrumbs(source_context)
         self.assertEqual(len(context['breadcrumbs']), 3)
@@ -983,8 +987,9 @@ class TemplateTagsTestCase(TestCase):
         self.assertEqual(context['linkbacks_per_entry'], 0)
 
         Category.objects.create(title='Category 1', slug='category-1')
-        author = Author.objects.create_user(username='webmaster',
+        user = get_user_model().objects.create_user(username='webmaster',
                                             email='webmaster@example.com')
+        author = Author.objects.get_or_create(user=user)[0]
         comments.get_model().objects.create(
             comment='My Comment 1', site=self.site,
             content_object=self.entry,

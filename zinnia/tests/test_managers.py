@@ -2,7 +2,7 @@
 from django.test import TestCase
 from django.contrib.sites.models import Site
 from django.contrib.auth.tests.utils import skipIfCustomUser
-
+from django.contrib.auth import get_user_model
 from tagging.models import Tag
 
 from zinnia.models.entry import Entry
@@ -24,11 +24,13 @@ class ManagersTestCase(TestCase):
             Site.objects.get_current(),
             Site.objects.create(domain='http://domain.com',
                                 name='Domain.com')]
-        self.authors = [
-            Author.objects.create_user(username='webmaster',
+        self.users = [get_user_model().objects.create(username='webmaster',
                                        email='webmaster@example.com'),
-            Author.objects.create_user(username='contributor',
+                      get_user_model().objects.create(username='contributor',
                                        email='contributor@example.com')]
+        self.authors = [
+            Author.objects.create(user=self.users[0]),
+            Author.objects.create(user=self.users[1])]
         self.categories = [
             Category.objects.create(title='Category 1',
                                     slug='category-1'),

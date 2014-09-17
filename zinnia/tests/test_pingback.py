@@ -16,6 +16,7 @@ from django.test.utils import restore_template_loaders
 from django.test.utils import setup_test_template_loader
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 import django_comments as comments
 
@@ -77,8 +78,10 @@ class PingBackTestCase(TestCase):
         # Preparing site
         self.site = Site.objects.get_current()
         # Creating tests entries
-        self.author = Author.objects.create_user(username='webmaster',
-                                                 email='webmaster@example.com')
+        self.user = get_user_model().objects.create_user(
+                        username='webmaster',
+                        email='webmaster@example.com')
+        self.author = Author.objects.get_or_create(user=self.user)[0]
         self.category = Category.objects.create(title='test', slug='test')
         params = {'title': 'My first entry',
                   'content': 'My first content',
@@ -249,7 +252,7 @@ class PingBackTestCase(TestCase):
             comment='Test pingback',
             user_url='http://external/blog/1/',
             user_name='Test pingback')
-        comment.flags.create(user=self.author, flag=PINGBACK)
+        comment.flags.create(user=self.user, flag=PINGBACK)
 
         response = self.server.pingback.extensions.getPingbacks(target)
         self.assertEqual(response, [

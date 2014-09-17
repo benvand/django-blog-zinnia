@@ -36,24 +36,28 @@ from zinnia.managers import DRAFT, PUBLISHED
 LOGIN_ERROR = 801
 PERMISSION_DENIED = 803
 
-
+from django.contrib.auth import get_user_model
 def authenticate(username, password, permission=None):
     """
     Authenticate staff_user with permission.
     """
+
+    user_model = get_user_model()
     try:
-        author = Author.objects.get(
-            **{'%s__exact' % Author.USERNAME_FIELD: username})
-    except Author.DoesNotExist:
+
+        user = user_model.objects.get(
+            **{'%s__exact' % user_model.USERNAME_FIELD:username})
+        Author.objects.get_or_create(user = user) #TODO needed?
+    except user_model.DoesNotExist:
         raise Fault(LOGIN_ERROR, _('Username is incorrect.'))
-    if not author.check_password(password):
+    if not user.check_password(password):
         raise Fault(LOGIN_ERROR, _('Password is invalid.'))
-    if not author.is_staff or not author.is_active:
+    if not user.is_staff or not user.is_active:
         raise Fault(PERMISSION_DENIED, _('User account unavailable.'))
     if permission:
-        if not author.has_perm(permission):
+        if not user.has_perm(permission):
             raise Fault(PERMISSION_DENIED, _('User cannot %s.') % permission)
-    return author
+    return user
 
 
 def blog_structure(site):
@@ -147,7 +151,7 @@ def post_structure(entry, site):
             'categories': [cat.title for cat in entry.categories.all()],
             'dateCreated': DateTime(entry.creation_date.isoformat()),
             'postid': entry.pk,
-            'userid': author.get_username(),
+            'userid': author.user.get_username(),
             # Useful Movable Type Extensions
             'mt_excerpt': entry.excerpt,
             'mt_allow_comments': int(entry.comment_enabled),
@@ -155,9 +159,9 @@ def post_structure(entry, site):
                                int(entry.trackback_enabled)),
             'mt_keywords': entry.tags,
             # Useful Wordpress Extensions
-            'wp_author': author.get_username(),
-            'wp_author_id': author.pk,
-            'wp_author_display_name': author.__str__(),
+            'wp_author': author.user.get_username(),
+            'wp_author_id': author.user.pk,
+            'wp_author_display_name': author.user.__str__(),
             'wp_password': entry.password,
             'wp_slug': entry.slug,
             'sticky': entry.featured}
@@ -193,7 +197,7 @@ def get_authors(apikey, username, password):
     """
     authenticate(username, password)
     return [author_structure(author)
-            for author in Author.objects.filter(is_staff=True)]
+            for author in get_user_model().objects.filter(is_staff=True)]
 
 
 @xmlrpc_func(returns='boolean', args=['string', 'string',
@@ -336,7 +340,8 @@ def edit_post(post_id, username, password, post, publish):
     => boolean
     """
     user = authenticate(username, password, 'zinnia.change_entry')
-    entry = Entry.objects.get(id=post_id, authors=user)
+    author = Author.objects.get_or_create(user=user)[0]
+    entry = Entry.objects.get(id=post_id, authors=author)
     if post.get('dateCreated'):
         creation_date = datetime.strptime(
             post['dateCreated'].value[:18], '%Y-%m-%dT%H:%M:%S')
@@ -365,7 +370,7 @@ def edit_post(post_id, username, password, post, publish):
     entry.save()
 
     if 'wp_author_id' in post and user.has_perm('zinnia.can_change_author'):
-        if int(post['wp_author_id']) != user.pk:
+        if int(post['wp_author_id']) != author.pk:
             author = Author.objects.get(pk=post['wp_author_id'])
             entry.authors.clear()
             entry.authors.add(author)

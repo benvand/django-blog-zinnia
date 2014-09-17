@@ -16,8 +16,9 @@ class AuthorTestCase(TestCase):
     def setUp(self):
         disconnect_entry_signals()
         self.site = Site.objects.get_current()
-        self.author = Author.objects.create_user(
-            'webmaster', 'webmaster@example.com')
+        self.user = get_user_model().objects.create(username ='webmaster',
+                                                    email = 'webmaster@example.com')
+        self.author = Author.objects.create(user=self.user)
         params = {'title': 'My entry',
                   'content': 'My content',
                   'tags': 'zinnia, test',
@@ -34,13 +35,13 @@ class AuthorTestCase(TestCase):
         self.assertEqual(self.author.entries_published().count(), 1)
 
     def test_str(self):
-        self.assertEqual(self.author.__str__(),
+        self.assertEqual(self.__str__(),
                          'webmaster')
-        self.author.first_name = 'John'
-        self.assertEqual(self.author.__str__(),
+        self.user.first_name = 'John'
+        self.assertEqual(self.__str__(),
                          'John')
-        self.author.last_name = 'Doe'
-        self.assertEqual(self.author.__str__(),
+        self.user.last_name = 'Doe'
+        self.assertEqual(self.__str__(),
                          'John Doe')
 
     def test_manager_pollution(self):

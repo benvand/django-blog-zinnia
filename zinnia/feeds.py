@@ -9,6 +9,7 @@ except ImportError:  # Python 2
 from django.contrib.sites.models import Site
 from django.core.urlresolvers import reverse
 from django.shortcuts import get_object_or_404
+from django.http import Http404
 from django.utils.feedgenerator import Atom1Feed
 from django.utils.translation import ugettext as _
 from django.contrib.syndication.views import Feed
@@ -17,6 +18,7 @@ from django.core.urlresolvers import NoReverseMatch
 from django.core.files.storage import default_storage
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth import get_user_model
 
 from bs4 import BeautifulSoup
 
@@ -106,7 +108,7 @@ class EntryFeed(ZinniaFeed):
         Return the first author's email.
         Should not be called if self.item_author_name has returned None.
         """
-        return self.item_author.email
+        return self.item_author.user.email
 
     def item_author_link(self, item):
         """
@@ -229,7 +231,10 @@ class AuthorEntries(EntryFeed):
         """
         Retrieve the author by his username.
         """
-        return get_object_or_404(Author, **{Author.USERNAME_FIELD: username})
+        try:
+             return Author.objects.get(**{'user__%s' % get_user_model().USERNAME_FIELD: username})
+        except Author.DoesNotExist:
+            return Http404
 
     def items(self, obj):
         """

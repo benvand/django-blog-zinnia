@@ -16,6 +16,7 @@ from django.utils.html import strip_tags
 from django.db.utils import IntegrityError
 from django.utils.encoding import smart_str
 from django.contrib.sites.models import Site
+from django.contrib.auth import get_user_model
 from django.template.defaultfilters import slugify
 from django.core.management.base import CommandError
 from django.core.management.base import LabelCommand
@@ -156,14 +157,16 @@ class Command(LabelCommand):
             if self.default_author:
                 entry.authors.add(self.default_author)
             elif feed_entry.get('author_detail'):
+                user_model=get_user_model()
                 try:
-                    author = Author.objects.create_user(
+                    user = user_model.objects.create_user(
                         slugify(feed_entry.author_detail.get('name')),
                         feed_entry.author_detail.get('email', ''))
                 except IntegrityError:
-                    author = Author.objects.get(**{
-                        Author.USERNAME_FIELD:
+                    user = user_model.objects.get(**{
+                        user_model.USERNAME_FIELD:
                         slugify(feed_entry.author_detail.get('name'))})
+                author = Author.objects.get_or_create(user=user)
                 entry.authors.add(author)
 
             self.write_out(self.style.ITEM('OK\n'))

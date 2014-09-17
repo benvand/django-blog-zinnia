@@ -11,6 +11,7 @@ from django.test.utils import setup_test_template_loader
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.auth.models import update_last_login
+from django.contrib.auth import get_user_model
 from django.contrib.auth.tests.utils import skipIfCustomUser
 
 import django_comments as comments
@@ -46,9 +47,10 @@ class ViewsBaseCase(TestCase):
         disconnect_entry_signals()
         disconnect_discussion_signals()
         self.site = Site.objects.get_current()
-        self.author = Author.objects.create_user(username='admin',
+        self.user = get_user_model().objects.create_user(username='admin',
                                                  email='admin@example.com',
                                                  password='password')
+        self.author = Author.objects.get_or_create(user=self.user)[0]
         self.category = Category.objects.create(title='Tests', slug='tests')
         params = {'title': 'Test 1',
                   'content': 'First test entry published',
@@ -441,7 +443,7 @@ class ViewsTestCase(ViewsBaseCase):
         with self.assertNumQueries(2):
             response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
-        Author.objects.create_superuser(
+        get_user_model().objects.create_superuser(
             'root', 'root@example.com', 'password')
         self.client.login(username='root', password='password')
         with self.assertNumQueries(3):
@@ -499,22 +501,22 @@ class ViewsTestCase(ViewsBaseCase):
 
     def test_zinnia_author_list(self):
         self.inhibit_templates('zinnia/author_list.html')
-        user = Author.objects.create(username='new-user',
+        user = get_user_model().objects.create(username='new-user',
                                      email='new_user@example.com')
         self.check_publishing_context(
             '/authors/', 1,
             friendly_context='author_list',
             queries=0)
-        self.first_entry.authors.add(user)
+        self.first_entry.authors.add(Author.objects.get_or_create(user=user)[0])
         self.check_publishing_context('/authors/', 2)
 
     def test_zinnia_author_detail(self):
         self.inhibit_templates('zinnia/author/admin/entry_list.html')
         response = self.check_publishing_context(
-            '/authors/admin/', 2, 3, 'entry_list', 2)
+            '/authors/admin/', 2, 3, 'entry_list', 3)
         self.assertTemplateUsed(
             response, 'zinnia/author/admin/entry_list.html')
-        self.assertEqual(response.context['author'].username, 'admin')
+        self.assertEqual(response.context['author'].user.get_username(), 'admin')
 
     def test_zinnia_author_detail_paginated(self):
         """Test case reproducing issue #207 on author
@@ -535,7 +537,7 @@ class ViewsTestCase(ViewsBaseCase):
         self.assertEqual(len(response.context['object_list']), 2)
         response = self.client.get('/authors/admin/page/2/')
         self.assertEqual(len(response.context['object_list']), 2)
-        self.assertEqual(response.context['author'].username, 'admin')
+        self.assertEqual(response.context['author'].user.get_username(), 'admin')
 
     def test_zinnia_tag_list(self):
         self.inhibit_templates('zinnia/tag_list.html')
@@ -713,7 +715,7 @@ class ViewsTestCase(ViewsBaseCase):
         self.assertEqual(response.context['comment'], None)
 
     def test_quick_entry(self):
-        Author.objects.create_superuser(
+        get_user_model().objects.create_superuser(
             'root', 'root@example.com', 'password')
         response = self.client.get('/quick-entry/')
         self.assertEqual(response.status_code, 302)
@@ -755,7 +757,7 @@ class ViewsTestCase(ViewsBaseCase):
         self.assertEqual(entry.content, '<p>Test content</p>')
 
     def test_quick_entry_non_ascii_title_issue_153(self):
-        Author.objects.create_superuser(
+        get_user_model().objects.create_superuser(
             'root', 'root@example.com', 'password')
         self.client.login(username='root', password='password')
         response = self.client.post('/quick-entry/',
@@ -773,7 +775,7 @@ class ViewsTestCase(ViewsBaseCase):
     def test_quick_entry_markup_language_issue_270(self):
         original_markup_language = quick_entry.MARKUP_LANGUAGE
         quick_entry.MARKUP_LANGUAGE = 'restructuredtext'
-        Author.objects.create_superuser(
+        get_user_model().objects.create_superuser(
             'root', 'root@example.com', 'password')
         self.client.login(username='root', password='password')
         response = self.client.post('/quick-entry/',
@@ -815,7 +817,7 @@ class CustomDetailViewsTestCase(ViewsBaseCase):
     def test_custom_author_detail(self):
         response = self.check_publishing_context('/authors/admin/', 2, 3)
         self.assertTemplateUsed(response, 'zinnia/entry_custom_list.html')
-        self.assertEqual(response.context['author'].username, 'admin')
+        self.assertEqual(response.context['author'].user.get_username(), 'admin')
         self.assertEqual(response.context['extra'], 'context')
 
     def test_custom_tag_detail(self):

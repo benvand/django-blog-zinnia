@@ -1,8 +1,9 @@
 """Views for Zinnia authors"""
 from django.db.models import Count
-from django.shortcuts import get_object_or_404
 from django.views.generic.list import ListView
 from django.views.generic.list import BaseListView
+from django.contrib.auth import get_user_model
+from django.http import Http404
 
 from zinnia.settings import PAGINATION
 from zinnia.models.author import Author
@@ -36,8 +37,10 @@ class BaseAuthorDetail(object):
         Retrieve the author by his username and
         build a queryset of his published entries.
         """
-        self.author = get_object_or_404(
-            Author, **{Author.USERNAME_FIELD: self.kwargs['username']})
+        try:
+             self.author = Author.objects.get(**{'user__%s' % get_user_model().USERNAME_FIELD: self.kwargs['username']})
+        except Author.DoesNotExist:
+            return Http404
         return self.author.entries_published()
 
     def get_context_data(self, **kwargs):
@@ -70,4 +73,4 @@ class AuthorDetail(EntryQuerysetTemplateResponseMixin,
         """
         The model name is the author's username.
         """
-        return self.author.get_username()
+        return self.author.user.get_username()

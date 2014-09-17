@@ -46,7 +46,7 @@ class AuthorListFilter(RelatedPublishedFilter):
     List filter for EntryAdmin with published authors only.
     """
     model = Author
-    lookup_key = 'authors__id'
+    lookup_key = 'authors__user__id'
     title = _('published authors')
     parameter_name = 'author'
 

@@ -2,6 +2,7 @@
 from django.test import TestCase
 from django.contrib.sites.models import Site
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 from zinnia.managers import PUBLISHED
 from zinnia.models.entry import Entry
@@ -22,9 +23,12 @@ class SitemapsTestCase(TestCase):
     def setUp(self):
         disconnect_entry_signals()
         self.site = Site.objects.get_current()
+        self.users = [
+            get_user_model().objects.create_user(username='admin', email='admin@example.com'),
+            get_user_model().objects.create_user(username='user', email='user@example.com')]
         self.authors = [
-            Author.objects.create(username='admin', email='admin@example.com'),
-            Author.objects.create(username='user', email='user@example.com')]
+            Author.objects.get_or_create(user=self.users[0])[0],
+            Author.objects.get_or_create(user=self.users[1])[0]]
         self.categories = [
             Category.objects.create(title='Category 1', slug='cat-1'),
             Category.objects.create(title='Category 2', slug='cat-2')]

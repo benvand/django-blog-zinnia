@@ -17,9 +17,9 @@ from pyparsing import CaselessLiteral
 from pyparsing import operatorPrecedence
 
 from django.db.models import Q
+from django.contrib.auth import get_user_model
 
 from zinnia.models.entry import Entry
-from zinnia.models.author import Author
 from zinnia.settings import STOP_WORDS
 
 
@@ -70,17 +70,18 @@ def createQ(token):
             return Q(categories__title__iexact=search) | \
                 Q(categories__slug__iexact=search)
     elif meta == 'author':
+        username_field = get_user_model().USERNAME_FIELD
         if wildcards == 'BOTH':
-            return Q(**{'authors__%s__icontains' % Author.USERNAME_FIELD:
+            return Q(**{'authors__user__%s__icontains' % username_field:
                         search})
         elif wildcards == 'START':
-            return Q(**{'authors__%s__iendswith' % Author.USERNAME_FIELD:
+            return Q(**{'authors__user__%s__iendswith' % username_field:
                         search})
         elif wildcards == 'END':
-            return Q(**{'authors__%s__istartswith' % Author.USERNAME_FIELD:
+            return Q(**{'authors__user__%s__istartswith' % username_field:
                         search})
         else:
-            return Q(**{'authors__%s__iexact' % Author.USERNAME_FIELD:
+            return Q(**{'authors__user__%s__iexact' % username_field:
                         search})
     elif meta == 'tag':  # TODO: tags ignore wildcards
         return Q(tags__icontains=search)

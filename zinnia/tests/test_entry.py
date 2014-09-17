@@ -10,6 +10,7 @@ from django.utils.translation import activate
 from django.utils.translation import deactivate
 from django.test.utils import override_settings
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 import django_comments as comments
 from django_comments.models import CommentFlag
@@ -65,8 +66,9 @@ class EntryTestCase(TestCase):
         self.assertEqual(self.entry.pingbacks.count(), 0)
         self.assertEqual(self.entry.trackbacks.count(), 0)
 
-        author = Author.objects.create_user(username='webmaster',
+        user = get_user_model().objects.create_user(username='webmaster',
                                             email='webmaster@example.com')
+        author = Author.objects.create(user=user)
 
         comment = comments.get_model().objects.create(
             comment='My Comment 3',
@@ -74,7 +76,7 @@ class EntryTestCase(TestCase):
             submit_date=timezone.now(),
             site=Site.objects.create(domain='http://toto.com',
                                      name='Toto.com'))
-        comment.flags.create(user=author, flag=CommentFlag.MODERATOR_APPROVAL)
+        comment.flags.create(user=user, flag=CommentFlag.MODERATOR_APPROVAL)
         self.assertEqual(self.entry.discussions.count(), 2)
         self.assertEqual(self.entry.comments.count(), 2)
         self.assertEqual(self.entry.pingbacks.count(), 0)
@@ -85,7 +87,7 @@ class EntryTestCase(TestCase):
             content_object=self.entry,
             submit_date=timezone.now(),
             site=site)
-        comment.flags.create(user=author, flag=PINGBACK)
+        comment.flags.create(user=user, flag=PINGBACK)
         self.assertEqual(self.entry.discussions.count(), 3)
         self.assertEqual(self.entry.comments.count(), 2)
         self.assertEqual(self.entry.pingbacks.count(), 1)
@@ -96,7 +98,7 @@ class EntryTestCase(TestCase):
             content_object=self.entry,
             submit_date=timezone.now(),
             site=site)
-        comment.flags.create(user=author, flag=TRACKBACK)
+        comment.flags.create(user=user, flag=TRACKBACK)
         self.assertEqual(self.entry.discussions.count(), 4)
         self.assertEqual(self.entry.comments.count(), 2)
         self.assertEqual(self.entry.pingbacks.count(), 1)

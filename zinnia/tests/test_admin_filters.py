@@ -8,6 +8,7 @@ from django.utils.translation import activate
 from django.utils.translation import deactivate
 from django.contrib.admin.views.main import ChangeList
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 from zinnia.models.entry import Entry
 from zinnia.models.author import Author
@@ -74,13 +75,21 @@ class AuthorListFilterTestCase(BaseListFilterTestCase):
 
     def setUp(self):
         super(AuthorListFilterTestCase, self).setUp()
-        self.authors = [
-            Author.objects.create_user(username='webmaster',
+
+        self.users = [
+            get_user_model().objects.create_user(username='webmaster',
                                        email='webmaster@example.com'),
-            Author.objects.create_user(username='contributor',
+            get_user_model().objects.create_user(username='contributor',
                                        email='contributor@example.com'),
-            Author.objects.create_user(username='reader',
+            get_user_model().objects.create_user(username='reader',
                                        email='reader@example.com')]
+
+
+        self.authors = [
+            Author.objects.create(user=self.users[0]),
+            Author.objects.create(user=self.users[1]),
+            Author.objects.create(user=self.users[2])]
+
         self.entry_1.authors.add(self.authors[0])
         self.entry_2.authors.add(*self.authors[:-1])
         self.entry_draft.authors.add(*self.authors)

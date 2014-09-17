@@ -17,7 +17,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.storage import default_storage
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.tests.utils import skipIfCustomUser
-
+from django.contrib.auth import get_user_model
 import django_comments as comments
 
 from tagging.models import Tag
@@ -57,10 +57,11 @@ class FeedsTestCase(TestCase):
         disconnect_discussion_signals()
         activate('en')
         self.site = Site.objects.get_current()
-        self.author = Author.objects.create(username='admin',
+        self.user = get_user_model().objects.create(username='admin',
                                             first_name='Root',
                                             last_name='Bloody',
                                             email='admin@example.com')
+        self.author = Author.objects.create(user=self.user)
         self.category = Category.objects.create(title='Tests', slug='tests')
         self.entry_ct_id = ContentType.objects.get_for_model(Entry).pk
 
@@ -84,25 +85,25 @@ class FeedsTestCase(TestCase):
     def create_discussions(self, entry):
         comment = comments.get_model().objects.create(
             comment='My Comment',
-            user=self.author,
+            user=self.user,
             user_name='admin',
             content_object=entry,
             site=self.site,
             submit_date=timezone.now())
         pingback = comments.get_model().objects.create(
             comment='My Pingback',
-            user=self.author,
+            user=self.user,
             content_object=entry,
             site=self.site,
             submit_date=timezone.now())
-        pingback.flags.create(user=self.author, flag=PINGBACK)
+        pingback.flags.create(user=self.user, flag=PINGBACK)
         trackback = comments.get_model().objects.create(
             comment='My Trackback',
-            user=self.author,
+            user=self.user,
             content_object=entry,
             site=self.site,
             submit_date=timezone.now())
-        trackback.flags.create(user=self.author, flag=TRACKBACK)
+        trackback.flags.create(user=self.user, flag=TRACKBACK)
         return [comment, pingback, trackback]
 
     def test_entry_feed(self):
@@ -112,13 +113,13 @@ class FeedsTestCase(TestCase):
         self.assertEqual(feed.item_categories(entry), [self.category.title])
         self.assertEqual(feed.item_author_name(entry),
                          self.author.__str__())
-        self.assertEqual(feed.item_author_email(entry), self.author.email)
+        self.assertEqual(feed.item_author_email(entry), self.author.user.email)
         self.assertEqual(
             feed.item_author_link(entry),
-            'http://example.com/authors/%s/' % self.author.username)
+            'http://example.com/authors/%s/' % self.author.user.username)
         # Test a NoReverseMatch for item_author_link
-        self.author.username = '[]'
-        self.author.save()
+        self.author.user.username = '[]'
+        self.author.user.save()
         feed.item_author_name(entry)
         self.assertEqual(feed.item_author_link(entry), 'http://example.com')
 

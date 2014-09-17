@@ -76,7 +76,7 @@ class EntryCommentModerator(CommentModerator):
         """
         exclude_list = self.mail_comment_notification_recipients + ['']
         recipient_list = set(
-            [author.email for author in content_object.authors.all()]) - \
+            [author.user.email for author in content_object.authors.all()]) - \
             set(exclude_list)
         if recipient_list:
             site = Site.objects.get_current()
@@ -97,7 +97,7 @@ class EntryCommentModerator(CommentModerator):
         the previous comments.
         """
         exclude_list = self.mail_comment_notification_recipients + \
-            [author.email for author in content_object.authors.all()] + \
+            [author.user.email for author in content_object.authors.all()] + \
             [comment.email]
         recipient_list = set(
             [other_comment.email for other_comment in content_object.comments

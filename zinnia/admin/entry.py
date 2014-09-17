@@ -13,6 +13,7 @@ from django.template.response import TemplateResponse
 from django.utils.translation import ungettext_lazy
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.staticfiles.storage import staticfiles_storage
+from django.contrib.auth import get_user_model
 
 from zinnia import settings
 from zinnia.managers import HIDDEN
@@ -101,10 +102,10 @@ class EntryAdmin(admin.ModelAdmin):
         try:
             authors = ['<a href="%s" target="blank">%s</a>' %
                        (author.get_absolute_url(),
-                        getattr(author, author.USERNAME_FIELD))
+                        getattr(author.user, author.user.USERNAME_FIELD))
                        for author in entry.authors.all()]
         except NoReverseMatch:
-            authors = [getattr(author, author.USERNAME_FIELD)
+            authors = [getattr(author.user, author.user.USERNAME_FIELD)
                        for author in entry.authors.all()]
         return ', '.join(authors)
     get_authors.allow_tags = True
@@ -186,8 +187,7 @@ class EntryAdmin(admin.ModelAdmin):
             form.cleaned_data['authors'] = entry.authors.all()
 
         if not entry.pk and not form.cleaned_data.get('authors'):
-            form.cleaned_data['authors'] = Author.objects.filter(
-                pk=request.user.pk)
+            form.cleaned_data['authors'] = Author.objects.filter(user__pk=request.user.pk)
 
         entry.last_update = timezone.now()
         entry.save()
@@ -197,7 +197,7 @@ class EntryAdmin(admin.ModelAdmin):
         Make special filtering by user's permissions.
         """
         if not request.user.has_perm('zinnia.can_view_all'):
-            queryset = self.model.objects.filter(authors__pk=request.user.pk)
+            queryset = self.model.objects.filter(authors__user__pk=request.user.pk)
         else:
             queryset = super(EntryAdmin, self).get_queryset(request)
         return queryset.prefetch_related('categories', 'authors', 'sites')
@@ -209,7 +209,7 @@ class EntryAdmin(admin.ModelAdmin):
         if db_field.name == 'authors':
             if request.user.has_perm('zinnia.can_change_author'):
                 kwargs['queryset'] = Author.objects.filter(
-                    Q(is_staff=True) | Q(entries__isnull=False)
+                    Q(user__is_staff=True) | Q(entries__isnull=False)
                     ).distinct()
             else:
                 kwargs['queryset'] = Author.objects.filter(pk=request.user.pk)

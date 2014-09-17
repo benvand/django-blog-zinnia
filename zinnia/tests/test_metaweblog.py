@@ -13,6 +13,7 @@ from django.test import TestCase
 from django.contrib.sites.models import Site
 from django.core.files.storage import default_storage
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 from tagging.models import Tag
 
@@ -37,14 +38,19 @@ class MetaWeblogTestCase(TestCase):
     def setUp(self):
         disconnect_entry_signals()
         # Create data
-        self.webmaster = Author.objects.create_superuser(
+        #TODO not get_or_create in tests
+        self.webmaster = get_user_model().objects.create_superuser(
             username='webmaster',
             email='webmaster@example.com',
             password='password')
-        self.contributor = Author.objects.create_user(
+        self.webmaster_author = Author.objects.get_or_create(
+                                    user = self.webmaster)[0]
+        self.contributor = get_user_model().objects.create_user(
             username='contributor',
             email='contributor@example.com',
             password='password')
+        self.contributor_author = Author.objects.get_or_create(
+                                    user = self.contributor)[0]
         self.site = Site.objects.get_current()
         self.categories = [
             Category.objects.create(title='Category 1',
@@ -56,7 +62,7 @@ class MetaWeblogTestCase(TestCase):
                   'creation_date': datetime(2010, 1, 1, 12),
                   'status': PUBLISHED}
         self.entry_1 = Entry.objects.create(**params)
-        self.entry_1.authors.add(self.webmaster)
+        self.entry_1.authors.add(self.webmaster_author)
         self.entry_1.categories.add(*self.categories)
         self.entry_1.sites.add(self.site)
 
@@ -64,7 +70,7 @@ class MetaWeblogTestCase(TestCase):
                   'creation_date': datetime(2010, 3, 15),
                   'tags': 'zinnia, test', 'slug': 'my-entry-2'}
         self.entry_2 = Entry.objects.create(**params)
-        self.entry_2.authors.add(self.webmaster)
+        self.entry_2.authors.add(self.webmaster_author)
         self.entry_2.categories.add(self.categories[0])
         self.entry_2.sites.add(self.site)
         # Instanciating the server proxy
@@ -252,7 +258,7 @@ class MetaWeblogTestCase(TestCase):
         self.assertEqual(Entry.objects.count(), 2)
         self.assertEqual(Entry.published.count(), 1)
         self.server.metaWeblog.newPost(
-            1, 'webmaster', 'password', post, 1)
+            1, 'webmaster_author', 'password', post, 1)
         self.assertEqual(Entry.objects.count(), 3)
         self.assertEqual(Entry.published.count(), 2)
         del post['dateCreated']

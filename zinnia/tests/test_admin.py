@@ -2,7 +2,6 @@
 from django.test import TestCase
 from django.test import RequestFactory
 from django.utils import timezone
-from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.utils.translation import activate
 from django.utils.translation import deactivate
@@ -10,6 +9,7 @@ from django.contrib.admin.sites import AdminSite
 from django.test.utils import restore_template_loaders
 from django.test.utils import setup_test_template_loader
 from django.contrib.auth.tests.utils import skipIfCustomUser
+from django.contrib.auth import get_user_model
 
 from zinnia import settings
 from zinnia.managers import PUBLISHED
@@ -102,10 +102,12 @@ class EntryAdminTestCase(BaseAdminTestCase):
         self.check_with_rich_and_poor_urls(
             self.admin.get_authors, (self.entry,),
             '', '')
-        author_1 = Author.objects.create_user(
+        user_1 = get_user_model().objects.create_user(
             'author-1', 'author1@example.com')
-        author_2 = Author.objects.create_user(
+        user_2 = get_user_model().objects.create_user(
             'author-2', 'author2@example.com')
+        author_1 = Author.objects.create(user=user_1)
+        author_2 = Author.objects.create(user=user_2)
         self.entry.authors.add(author_1)
         self.check_with_rich_and_poor_urls(
             self.admin.get_authors, (self.entry,),
@@ -176,7 +178,7 @@ class EntryAdminTestCase(BaseAdminTestCase):
                          self.entry.is_visible)
 
     def test_save_model(self):
-        user = User.objects.create_user(
+        user = get_user_model().objects.create_user(
             'user', 'user@exemple.com')
         self.request.user = user
         form = EntryAdmin.form({'title': 'title'})
@@ -188,31 +190,37 @@ class EntryAdminTestCase(BaseAdminTestCase):
         self.assertEqual(self.entry.excerpt, self.entry.content)
         self.admin.save_model(self.request, Entry(),
                               form, False)
+
         self.assertEqual(len(form.cleaned_data['authors']), 1)
 
     def test_queryset(self):
-        user = Author.objects.create_user(
+        user = get_user_model().objects.create_user(
             'user', 'user@exemple.com')
-        self.entry.authors.add(user)
-        root = Author.objects.create_superuser(
+        author = Author.objects.get_or_create(user=user)[0]
+        self.entry.authors.add(author)
+        root = get_user_model().objects.create_superuser(
             'root', 'root@exemple.com', 'toor')
+        root_author = Author.objects.get_or_create(user=root)[0]
         params = {'title': 'My root title',
                   'content': 'My root content',
                   'slug': 'my-root-titile'}
         root_entry = Entry.objects.create(**params)
-        root_entry.authors.add(root)
-        self.request.user = User.objects.get(pk=user.pk)
+        root_entry.authors.add(root_author)
+        self.request.user = get_user_model().objects.get(pk=user.pk)
         self.assertEqual(len(self.admin.get_queryset(self.request)), 1)
-        self.request.user = User.objects.get(pk=root.pk)
+        self.request.user = get_user_model().objects.get(pk=root.pk)
         self.assertEqual(len(self.admin.get_queryset(self.request)), 2)
 
     def test_formfield_for_manytomany(self):
-        staff = User.objects.create_user(
+        staff = get_user_model().objects.create_user(
             'staff', 'staff@exemple.com')
-        author = User.objects.create_user(
+        staff_author = Author.objects.create(user=staff)
+        user= get_user_model().objects.create_user(
             'author', 'author@exemple.com')
-        root = User.objects.create_superuser(
+        user_author = Author.objects.create(user=user)
+        root = get_user_model().objects.create_superuser(
             'root', 'root@exemple.com', 'toor')
+        root_author = Author.objects.create(user=root)
         self.request.user = staff
         field = self.admin.formfield_for_manytomany(
             Entry.authors.field, self.request)
@@ -226,15 +234,15 @@ class EntryAdminTestCase(BaseAdminTestCase):
         field = self.admin.formfield_for_manytomany(
             Entry.authors.field, self.request)
         self.assertEqual(field.queryset.count(), 2)
-        self.entry.authors.add(Author.objects.get(pk=author.pk))
+        self.entry.authors.add(Author.objects.get(pk=user_author.pk))
         field = self.admin.formfield_for_manytomany(
             Entry.authors.field, self.request)
         self.assertEqual(field.queryset.count(), 3)
 
     def test_get_readonly_fields(self):
-        user = User.objects.create_user(
+        user = get_user_model().objects.create_user(
             'user', 'user@exemple.com')
-        root = User.objects.create_superuser(
+        root = get_user_model().objects.create_superuser(
             'root', 'root@exemple.com', 'toor')
         self.request.user = user
         self.assertEqual(self.admin.get_readonly_fields(self.request),
@@ -245,9 +253,9 @@ class EntryAdminTestCase(BaseAdminTestCase):
 
     def test_get_actions(self):
         original_ping_directories = settings.PING_DIRECTORIES
-        user = User.objects.create_user(
+        user = get_user_model().objects.create_user(
             'user', 'user@exemple.com')
-        root = User.objects.create_superuser(
+        root = get_user_model().objects.create_superuser(
             'root', 'root@exemple.com', 'toor')
         self.request.user = user
         settings.PING_DIRECTORIES = True
@@ -287,7 +295,7 @@ class EntryAdminTestCase(BaseAdminTestCase):
         settings.PING_DIRECTORIES = original_ping_directories
 
     def test_get_actions_in_popup_mode_issue_291(self):
-        user = User.objects.create_user(
+        user = get_user_model().objects.create_user(
             'user', 'user@exemple.com')
         request = self.request_factory.get('/?_popup=1')
         request.user = user
@@ -296,13 +304,14 @@ class EntryAdminTestCase(BaseAdminTestCase):
             [])
 
     def test_make_mine(self):
-        user = Author.objects.create_user(
+        user = get_user_model().objects.create_user(
             'user', 'user@exemple.com')
-        self.request.user = User.objects.get(pk=user.pk)
+        author = Author.objects.create(user=user)
+        self.request.user = get_user_model().objects.get(pk=user.pk)
         self.request._messages = TestMessageBackend()
-        self.assertEqual(user.entries.count(), 0)
+        self.assertEqual(author.entries.count(), 0)
         self.admin.make_mine(self.request, Entry.objects.all())
-        self.assertEqual(user.entries.count(), 1)
+        self.assertEqual(author.entries.count(), 1)
         self.assertEqual(len(self.request._messages.messages), 1)
 
     def test_make_published(self):
